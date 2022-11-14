@@ -1,11 +1,13 @@
-const { Engine, Render, Runner, World, Bodies, Body } = Matter;
+const { Engine, Render, Runner, World, Bodies, Body, Events } = Matter;
 
-const cells = 10;
+const cellsHorizontal = 14;
+const cellsVertical = 10;
 const wallThickness = 10;
-const width = 600;
-const height = 600;
+const width = window.innerWidth;
+const height = window.innerHeight;
 
-const unitLength = width / cells;
+const unitLengthX = width / cellsHorizontal;
+const unitLengthY = height / cellsVertical;
 
 const engine = Engine.create();
 engine.world.gravity.y = 0;
@@ -14,7 +16,7 @@ const render = Render.create({
     element: document.body,
     engine: engine,
     options: {
-        wireframes: true,
+        wireframes: false,
         width,
         height
     }
@@ -39,7 +41,7 @@ const shuffle = (arr) => {
     while (counter > 0) {
         const index = Math.floor(Math.random() * counter);
 
-        counter --;
+        counter--;
 
         const temp = arr[counter];
         arr[counter] = arr[index];
@@ -49,20 +51,20 @@ const shuffle = (arr) => {
     return arr;
 }
 
-const grid = Array(cells)
+const grid = Array(cellsVertical)
     .fill(null)
-    .map(() => Array(cells).fill(false));
+    .map(() => Array(cellsHorizontal).fill(false));
 
-const verticals = Array(cells)
+const verticals = Array(cellsVertical)
     .fill(null)
-    .map(() => Array(cells -1).fill(false));
+    .map(() => Array(cellsHorizontal - 1).fill(false));
 
-const horizontals = Array(cells - 1)
+const horizontals = Array(cellsVertical - 1)
     .fill(null)
-    .map(() => Array(cells).fill(false));
+    .map(() => Array(cellsHorizontal).fill(false));
 
-const startRow = Math.floor(Math.random() * cells);
-const startColumn = Math.floor(Math.random() * cells);
+const startRow = Math.floor(Math.random() * cellsVertical);
+const startColumn = Math.floor(Math.random() * cellsHorizontal);
 
 const stepThroughCell = (row, column) => {
     // If cell visited return
@@ -83,16 +85,16 @@ const stepThroughCell = (row, column) => {
 
     // For each neighbor...
     for (let neighbor of neighbors) {
-        const [nextRow, nextColumn, direction] = neighbor;   
-        
+        const [nextRow, nextColumn, direction] = neighbor;
+
         // See if that neighbor is out of bounds
-        if (nextRow < 0 || nextRow >= cells || 
-                nextColumn < 0 || nextColumn >= cells) {
+        if (nextRow < 0 || nextRow >= cellsVertical ||
+            nextColumn < 0 || nextColumn >= cellsHorizontal) {
             continue;
         }
-        
+
         // If neighbor visited, continue to next neighbor
-        if (grid[nextRow][nextColumn]){
+        if (grid[nextRow][nextColumn]) {
             continue;
         }
 
@@ -106,7 +108,7 @@ const stepThroughCell = (row, column) => {
         } else if (direction === 'down') {
             horizontals[row][column] = true;
         }
-        
+
         // Visit next cell
         stepThroughCell(nextRow, nextColumn);
     }
@@ -116,16 +118,17 @@ stepThroughCell(startRow, startColumn);
 
 horizontals.forEach((row, rowIndex) => {
     row.forEach((open, columnIndex) => {
-        if(open) {
+        if (open) {
             return;
         }
 
         const wall = Bodies.rectangle(
-            columnIndex * unitLength + unitLength / 2,
-            rowIndex * unitLength + unitLength,
-            unitLength,
+            columnIndex * unitLengthX + unitLengthX / 2,
+            rowIndex * unitLengthY + unitLengthY,
+            unitLengthX,
             wallThickness,
             {
+                label: 'wall',
                 isStatic: true
             }
         );
@@ -135,16 +138,17 @@ horizontals.forEach((row, rowIndex) => {
 
 verticals.forEach((row, rowIndex) => {
     row.forEach((open, columnIndex) => {
-        if(open) {
+        if (open) {
             return;
         }
 
         const wall = Bodies.rectangle(
-            columnIndex * unitLength + unitLength,
-            rowIndex * unitLength + unitLength / 2,
+            columnIndex * unitLengthX + unitLengthX,
+            rowIndex * unitLengthY + unitLengthY / 2,
             wallThickness,
-            unitLength,
+            unitLengthY,
             {
+                label: 'wall',
                 isStatic: true
             }
         );
@@ -154,21 +158,29 @@ verticals.forEach((row, rowIndex) => {
 
 // Goal
 const goal = Bodies.rectangle(
-    width - unitLength / 2,
-    height - unitLength / 2,
-    unitLength * .7,
-    unitLength * .7,
+    width - unitLengthX / 2,
+    height - unitLengthY / 2,
+    unitLengthX * .7,
+    unitLengthY * .6,
     {
-        isStatic: true
+        label: 'goal',
+        isStatic: true,
+        render: {
+            fillStyle: '#91edab'
+        }
     }
 );
 World.add(world, goal);
 
 // Ball
+const ballRadius = Math.min(unitLengthX, unitLengthY) / 4;
 const ball = Bodies.circle(
-    unitLength / 2,
-    unitLength / 2,
-    unitLength / 3
+    unitLengthX / 2,
+    unitLengthY / 2,
+    ballRadius,
+    {
+        label: 'ball',
+    }
 );
 World.add(world, ball);
 
@@ -188,3 +200,44 @@ document.addEventListener('keydown', event => {
         Body.setVelocity(ball, { x: x - 5, y });
     }
 });
+
+// Win condition
+Events.on(engine, 'collisionStart', event => {
+    event.pairs.forEach((collision) => {
+        const labels = ['ball', 'goal'];
+
+        if (labels.includes(collision.bodyA.label) &&
+            labels.includes(collision.bodyB.label)) {
+
+            document.querySelector('.winner')
+                .classList.remove('hidden');
+            world.gravity.y = 1;
+            world.bodies.forEach(body => {
+                if (body.label === 'wall') {
+                    Body.setStatic(body, false);
+                }
+            })
+        }
+    })
+});
+
+// Limit maximum speed of the ball
+const limitMaxSpeed = () => {
+    let maxSpeed = 10;
+    if (ball.velocity.x > maxSpeed) {
+        Body.setVelocity(ball, { x: maxSpeed, y: ball.velocity.y });
+    }
+
+    if (ball.velocity.x < -maxSpeed) {
+        Body.setVelocity(ball, { x: -maxSpeed, y: ball.velocity.y });
+    }
+
+    if (ball.velocity.y > maxSpeed) {
+        Body.setVelocity(ball, { x: ball.velocity.x, y: maxSpeed });
+    }
+
+    if (ball.velocity.y < -maxSpeed) {
+        Body.setVelocity(ball, { x: -ball.velocity.x, y: -maxSpeed });
+    }
+}
+Events.on(engine, 'beforeUpdate', limitMaxSpeed);
