@@ -1,9 +1,12 @@
-Maze Game with JS
-A Maze game using Matter.js to generate the shapes and efects.
+<h2>Maze Game with JS</h2>
 
-To move the ball use: W S A D keys
+<p>A Maze game using Matter.js to generate the shapes and effects.</p>
 
-key features:
-Use of the library Matter.js
-Generate a maze randomly
-Shuffle algorithm
+<p>To move the ball use: <b>W S A D</b> keys</p>
+
+<p>key features:</p>
+<ul>
+<li>Use of the library Matter.js</li>
+<li>Generate a maze randomly</li>
+<li>Shuffle algorithm</li>
+</ul>
